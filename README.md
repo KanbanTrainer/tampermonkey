@@ -11,6 +11,19 @@ Small browser fixes and utilities, kept in Git so the repository—not Tampermon
 
 Clicking an **Install** link opens the raw `.user.js` file. With Tampermonkey installed, Tampermonkey should offer to install or update it.
 
+## Request a script change
+
+**[Create an issue](https://github.com/KanbanTrainer/tampermonkey/issues/new/choose)** and describe a new script or a change to an existing one.
+
+The repository is configured so that:
+
+1. Copilot coding agent is assigned when the issue is created.
+2. Copilot implements the request in a linked pull request.
+3. The originating issue gets a live status comment when the Copilot PR starts, receives commits, becomes ready for review, or closes.
+4. Repository instructions require version bumps, README/index updates, fixtures, and validation.
+
+The dedicated **Script request** form gives Copilot the cleanest specification, but blank issues are also automatically assigned.
+
 ## Automatic updates
 
 Every userscript must include:

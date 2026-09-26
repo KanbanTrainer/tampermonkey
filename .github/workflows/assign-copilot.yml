@@ -1,0 +1,67 @@
+name: Assign issues to Copilot
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  assign:
+    if: github.actor != 'copilot-swe-agent[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign Copilot coding agent
+        uses: actions/github-script@v9
+        with:
+          retries: 2
+          script: |
+            const issue = context.payload.issue;
+            const copilotLogin = 'copilot-swe-agent[bot]';
+
+            if (issue.assignees?.some(a => a.login === copilotLogin)) {
+              core.info('Copilot is already assigned.');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+
+            try {
+              await github.request(
+                'POST /repos/{owner}/{repo}/issues/{issue_number}/assignees',
+                {
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  assignees: [copilotLogin],
+                  agent_assignment: {
+                    target_repo: `${owner}/${repo}`,
+                    base_branch: 'main',
+                    custom_instructions:
+                      'Implement this issue end-to-end. Follow AGENTS.md and .github/copilot-instructions.md. Keep the pull request linked to the issue with a closing keyword.',
+                  },
+                  headers: {
+                    'X-GitHub-Api-Version': '2022-11-28',
+                  },
+                }
+              );
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issue.number,
+                body:
+                  'Copilot has been assigned automatically. It will implement this in a linked pull request; progress from that PR will be mirrored back here.',
+              });
+            } catch (error) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issue.number,
+                body:
+                  `Automatic Copilot assignment failed: **${error.message}**\n\nYou can still assign **Copilot** from the issue’s Assignees menu.`,
+              });
+              throw error;
+            }

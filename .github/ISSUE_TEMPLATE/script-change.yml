@@ -1,0 +1,52 @@
+name: Script request
+description: Create a new userscript or change an existing one. Copilot starts automatically.
+title: "[Script] "
+assignees:
+  - copilot-swe-agent[bot]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the behavior you want. Once submitted, Copilot will be assigned automatically and will implement it in a pull request.
+
+  - type: dropdown
+    id: target
+    attributes:
+      label: Target
+      description: Is this a new script or a change to an existing one?
+      options:
+        - New userscript
+        - scroll-to-bottom.user.js
+        - auto-retry.user.js
+        - Other existing userscript
+    validations:
+      required: true
+
+  - type: textarea
+    id: request
+    attributes:
+      label: What should it do?
+      description: Describe the desired behavior in plain language.
+      placeholder: |
+        Example: On example.com, add a button that...
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Where should it run?
+      description: URLs/sites/pages where this behavior should apply. Say "everywhere" only when it is intentionally global.
+      placeholder: https://example.com/*
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Optional concrete examples or edge cases. Copilot will also infer sensible tests from the request.
+      placeholder: |
+        - Only appears when...
+        - Must not interfere with...
+        - Persists for this tab only...
