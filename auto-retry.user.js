@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Auto Retry Buttons
+// @name         Retry Helper
 // @namespace    https://github.com/KanbanTrainer/tampermonkey
-// @version      1.0.3
-// @description  Automatically clicks Retry or Try again buttons every 30 seconds, with a countdown and per-tab pause control.
+// @version      2.0.0
+// @description  Prompts before retrying Retry or Try again buttons, with optional continuous retry for the current tab.
 // @match        *://*/*
 // @grant        none
 // @run-at       document-idle
@@ -13,30 +13,31 @@
 (() => {
   'use strict';
 
-  const CHECK_INTERVAL_SECONDS = 30;
-  const SESSION_DISABLED_KEY = 'tampermonkey-auto-retry-disabled';
+  const RETRY_INTERVAL_SECONDS = 30;
+  const CONTINUOUS_RETRY_KEY = 'tampermonkey-retry-helper-continuous';
   const RETRY_LABELS = new Set(['retry', 'try again']);
 
-  let secondsRemaining = CHECK_INTERVAL_SECONDS;
-  let hadRetryTarget = false;
+  let retryWasPresent = false;
+  let dismissedForCurrentAppearance = false;
+  let secondsRemaining = RETRY_INTERVAL_SECONDS;
 
-  function isDisabled() {
+  function isContinuousRetryEnabled() {
     try {
-      return sessionStorage.getItem(SESSION_DISABLED_KEY) === 'true';
+      return sessionStorage.getItem(CONTINUOUS_RETRY_KEY) === 'true';
     } catch {
       return false;
     }
   }
 
-  function setDisabled(disabled) {
+  function setContinuousRetryEnabled(enabled) {
     try {
-      if (disabled) {
-        sessionStorage.setItem(SESSION_DISABLED_KEY, 'true');
+      if (enabled) {
+        sessionStorage.setItem(CONTINUOUS_RETRY_KEY, 'true');
       } else {
-        sessionStorage.removeItem(SESSION_DISABLED_KEY);
+        sessionStorage.removeItem(CONTINUOUS_RETRY_KEY);
       }
     } catch {
-      // Keep the in-page control usable even when sessionStorage is unavailable.
+      // Keep working even when sessionStorage is unavailable.
     }
   }
 
@@ -61,20 +62,20 @@
 
     Object.assign(toast.style, {
       position: 'fixed',
-      right: '20px',
-      bottom: '88px',
+      right: '16px',
+      bottom: '72px',
       zIndex: '2147483647',
-      padding: '10px 14px',
-      borderRadius: '10px',
+      padding: '8px 11px',
+      borderRadius: '9px',
       background: 'rgba(25, 25, 25, 0.94)',
       color: '#fff',
       fontFamily: 'system-ui, sans-serif',
-      fontSize: '14px',
+      fontSize: '13px',
       fontWeight: '600',
       boxShadow: '0 4px 18px rgba(0, 0, 0, 0.25)',
       backdropFilter: 'blur(8px)',
       opacity: '0',
-      transform: 'translateY(8px)',
+      transform: 'translateY(6px)',
       transition: 'opacity 150ms ease, transform 150ms ease',
       pointerEvents: 'none',
     });
@@ -88,19 +89,29 @@
 
     setTimeout(() => {
       toast.style.opacity = '0';
-      toast.style.transform = 'translateY(8px)';
+      toast.style.transform = 'translateY(6px)';
       setTimeout(() => toast.remove(), 200);
-    }, 2500);
+    }, 2200);
   }
 
-  function createStatusControl() {
+  function clickRetryButtons(buttons, message = 'Retried') {
+    for (const button of buttons) {
+      button.click();
+    }
+
+    if (buttons.length > 0) {
+      showToast(buttons.length === 1 ? message : `${message} ${buttons.length} items`);
+    }
+  }
+
+  function createControl() {
     const host = document.createElement('div');
-    host.id = 'tampermonkey-auto-retry-control';
+    host.id = 'tampermonkey-retry-helper';
     Object.assign(host.style, {
       all: 'initial',
       position: 'fixed',
-      right: '20px',
-      bottom: '20px',
+      right: '16px',
+      bottom: '16px',
       zIndex: '2147483647',
       display: 'none',
     });
@@ -109,111 +120,149 @@
     shadow.innerHTML = `
       <style>
         :host { all: initial; }
+
         .panel {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 9px 12px;
+          gap: 7px;
+          padding: 7px 8px 7px 10px;
           border: 1px solid rgba(255, 255, 255, 0.14);
-          border-radius: 12px;
-          background: rgba(25, 25, 25, 0.92);
+          border-radius: 10px;
+          background: rgba(25, 25, 25, 0.94);
           color: #fff;
           box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
           backdrop-filter: blur(10px);
-          font: 500 13px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          font: 500 12px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           white-space: nowrap;
         }
-        .countdown {
-          min-width: 92px;
+
+        .message {
+          margin-right: 2px;
           font-variant-numeric: tabular-nums;
         }
-        label {
-          display: flex;
-          align-items: center;
-          gap: 6px;
+
+        button {
+          appearance: none;
+          border: 0;
+          border-radius: 7px;
+          padding: 5px 8px;
+          background: rgba(255, 255, 255, 0.12);
+          color: #fff;
+          font: inherit;
           cursor: pointer;
-          color: rgba(255, 255, 255, 0.8);
-          user-select: none;
         }
-        input {
-          margin: 0;
-          accent-color: currentColor;
+
+        button:hover {
+          background: rgba(255, 255, 255, 0.20);
+        }
+
+        .primary {
+          background: rgba(255, 255, 255, 0.20);
+          font-weight: 650;
+        }
+
+        .close {
+          padding: 3px 6px;
+          background: transparent;
+          color: rgba(255, 255, 255, 0.7);
+          font-size: 16px;
+          line-height: 1;
+        }
+
+        .close:hover {
+          background: rgba(255, 255, 255, 0.10);
+          color: #fff;
+        }
+
+        [hidden] {
+          display: none !important;
         }
       </style>
+
       <div class="panel">
-        <span class="countdown" aria-live="polite"></span>
-        <label>
-          <input type="checkbox">
-          Disable for this tab
-        </label>
+        <span class="message" aria-live="polite">Retry?</span>
+        <button class="retry primary" type="button">Retry now</button>
+        <button class="continuous" type="button">Keep retrying</button>
+        <button class="close" type="button" aria-label="Dismiss retry helper" title="Dismiss">×</button>
       </div>
     `;
 
-    const countdown = shadow.querySelector('.countdown');
-    const checkbox = shadow.querySelector('input');
-    checkbox.checked = isDisabled();
+    const message = shadow.querySelector('.message');
+    const retryButton = shadow.querySelector('.retry');
+    const continuousButton = shadow.querySelector('.continuous');
+    const closeButton = shadow.querySelector('.close');
 
-    checkbox.addEventListener('change', () => {
-      setDisabled(checkbox.checked);
-      if (!checkbox.checked) {
-        secondsRemaining = CHECK_INTERVAL_SECONDS;
-      }
-      updateStatus(countdown, checkbox.checked);
+    retryButton.addEventListener('click', () => {
+      const buttons = findRetryButtons();
+      clickRetryButtons(buttons);
+      dismissedForCurrentAppearance = true;
+      host.style.display = 'none';
+    });
+
+    continuousButton.addEventListener('click', () => {
+      setContinuousRetryEnabled(true);
+      secondsRemaining = RETRY_INTERVAL_SECONDS;
+      const buttons = findRetryButtons();
+      clickRetryButtons(buttons, 'Continuous retry enabled');
+      render();
+    });
+
+    closeButton.addEventListener('click', () => {
+      setContinuousRetryEnabled(false);
+      dismissedForCurrentAppearance = true;
+      secondsRemaining = RETRY_INTERVAL_SECONDS;
+      host.style.display = 'none';
+      showToast('Retry helper dismissed');
     });
 
     document.documentElement.appendChild(host);
-    return { host, countdown, checkbox };
+
+    return {
+      host,
+      message,
+      retryButton,
+      continuousButton,
+    };
   }
 
-  function updateStatus(countdown, disabled = isDisabled()) {
-    countdown.textContent = disabled
-      ? 'Auto-retry paused'
-      : `Retry check in ${secondsRemaining}s`;
-  }
+  const control = createControl();
 
-  function clickRetryButtons(buttons) {
-    for (const button of buttons) {
-      button.click();
-    }
-
-    if (buttons.length > 0) {
-      showToast(
-        buttons.length === 1
-          ? 'Retried automatically'
-          : `Retried ${buttons.length} automatically`
-      );
-    }
-  }
-
-  const { host, countdown, checkbox } = createStatusControl();
-
-  function refreshPresence() {
+  function render() {
     const buttons = findRetryButtons();
-    const hasRetryTarget = buttons.length > 0;
+    const retryIsPresent = buttons.length > 0;
 
-    if (hasRetryTarget) {
-      host.style.display = 'block';
+    if (!retryIsPresent) {
+      retryWasPresent = false;
+      dismissedForCurrentAppearance = false;
+      secondsRemaining = RETRY_INTERVAL_SECONDS;
+      control.host.style.display = 'none';
+      return buttons;
     }
 
-    if (hasRetryTarget && !hadRetryTarget) {
-      secondsRemaining = CHECK_INTERVAL_SECONDS;
+    if (!retryWasPresent) {
+      retryWasPresent = true;
+      dismissedForCurrentAppearance = false;
+      secondsRemaining = RETRY_INTERVAL_SECONDS;
     }
 
-    hadRetryTarget = hadRetryTarget || hasRetryTarget;
-    checkbox.checked = isDisabled();
-
-    if (hasRetryTarget) {
-      updateStatus(countdown, checkbox.checked);
-    } else if (hadRetryTarget) {
-      countdown.textContent = checkbox.checked
-        ? 'Auto-retry paused'
-        : 'Waiting for Retry…';
+    if (dismissedForCurrentAppearance) {
+      control.host.style.display = 'none';
+      return buttons;
     }
+
+    const continuous = isContinuousRetryEnabled();
+
+    control.host.style.display = 'block';
+    control.retryButton.hidden = continuous;
+    control.continuousButton.hidden = continuous;
+    control.message.textContent = continuous
+      ? `Retrying in ${secondsRemaining}s`
+      : 'Retry?';
 
     return buttons;
   }
 
-  const observer = new MutationObserver(refreshPresence);
+  const observer = new MutationObserver(render);
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
@@ -222,23 +271,22 @@
     attributeFilter: ['disabled', 'aria-disabled'],
   });
 
-  refreshPresence();
+  render();
 
   setInterval(() => {
-    const buttons = refreshPresence();
+    const buttons = render();
 
-    if (buttons.length === 0 || isDisabled()) {
+    if (buttons.length === 0 || !isContinuousRetryEnabled() || dismissedForCurrentAppearance) {
       return;
     }
 
     secondsRemaining -= 1;
 
     if (secondsRemaining <= 0) {
-      clickRetryButtons(buttons);
-      secondsRemaining = CHECK_INTERVAL_SECONDS;
-      refreshPresence();
-    } else {
-      updateStatus(countdown, false);
+      clickRetryButtons(buttons, 'Retried automatically');
+      secondsRemaining = RETRY_INTERVAL_SECONDS;
     }
+
+    render();
   }, 1000);
 })();
