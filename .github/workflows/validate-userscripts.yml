@@ -1,0 +1,57 @@
+name: Validate userscripts
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate userscript metadata and syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          files=(*.user.js)
+          for file in "${files[@]}"; do
+            expected="https://raw.githubusercontent.com/KanbanTrainer/tampermonkey/main/$file"
+
+            grep -Eq '^// @name[[:space:]]+[^[:space:]].*$' "$file"
+            grep -Eq '^// @version[[:space:]]+[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?[[:space:]]*$' "$file"
+            grep -Fqx "// @updateURL    $expected" "$file" || grep -Eq "^// @updateURL[[:space:]]+$expected[[:space:]]*$" "$file"
+            grep -Fqx "// @downloadURL  $expected" "$file" || grep -Eq "^// @downloadURL[[:space:]]+$expected[[:space:]]*$" "$file"
+
+            node --check "$file"
+          done
+
+      - name: Require version bump for changed userscripts
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+
+          git diff --name-only "$base" "$head" -- '*.user.js' | while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            [ -f "$file" ] || continue
+
+            new_version="$(sed -nE 's#^// @version[[:space:]]+([^[:space:]]+).*#\1#p' "$file" | head -1)"
+            old_version="$(git show "$base:$file" 2>/dev/null | sed -nE 's#^// @version[[:space:]]+([^[:space:]]+).*#\1#p' | head -1 || true)"
+
+            if [ -n "$old_version" ] && [ "$new_version" = "$old_version" ]; then
+              echo "::error file=$file::@version must change when the userscript changes ($old_version)"
+              exit 1
+            fi
+          done
