@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auto Retry userscript fixture</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 48rem; margin: 3rem auto; padding: 0 1rem; }
+    .controls { display: flex; gap: .75rem; flex-wrap: wrap; }
+    button { font: inherit; padding: .6rem .9rem; }
+    #target { margin-top: 2rem; padding: 1rem; border: 1px dashed currentColor; min-height: 4rem; }
+  </style>
+</head>
+<body>
+  <h1>Auto Retry smoke-test fixture</h1>
+  <p>The userscript control should be invisible until a matching retry button exists.</p>
+
+  <div class="controls">
+    <button id="show-retry" type="button">Show Retry</button>
+    <button id="show-try-again" type="button">Show Try again</button>
+    <button id="clear" type="button">Clear target</button>
+  </div>
+
+  <div id="target" aria-live="polite">No retry target is present.</div>
+
+  <script>
+    const target = document.querySelector('#target');
+
+    function addTarget(label) {
+      target.replaceChildren();
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      button.addEventListener('click', () => {
+        target.textContent = `${label} clicked at ${new Date().toLocaleTimeString()}`;
+      });
+      target.appendChild(button);
+    }
+
+    document.querySelector('#show-retry').addEventListener('click', () => addTarget('Retry'));
+    document.querySelector('#show-try-again').addEventListener('click', () => addTarget('Try again'));
+    document.querySelector('#clear').addEventListener('click', () => {
+      target.textContent = 'No retry target is present.';
+    });
+  </script>
+</body>
+</html>

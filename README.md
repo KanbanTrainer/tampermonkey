@@ -7,7 +7,7 @@ Small browser fixes and utilities, kept in Git so the repository—not Tampermon
 | Script | What it does | Version | Install |
 | --- | --- | ---: | --- |
 | **Scroll to Bottom Button** | Shows a floating ↓ button whenever the page is not at the bottom. | `1.0.0` | **[Install](https://raw.githubusercontent.com/KanbanTrainer/tampermonkey/main/scroll-to-bottom.user.js)** |
-| **Auto Retry Buttons** | Automatically retries matching Retry/Try again buttons, with countdown and per-tab pause. | `1.0.0` | **[Install](https://raw.githubusercontent.com/KanbanTrainer/tampermonkey/main/auto-retry.user.js)** |
+| **Auto Retry Buttons** | Automatically retries matching Retry/Try again buttons, showing its countdown and per-tab pause control only while a retry target exists. | `1.0.1` | **[Install](https://raw.githubusercontent.com/KanbanTrainer/tampermonkey/main/auto-retry.user.js)** |
 
 Clicking an **Install** link opens the raw `.user.js` file. With Tampermonkey installed, Tampermonkey should offer to install or update it.
 
@@ -45,13 +45,25 @@ A changed userscript must always get a newer `@version`. CI validates userscript
 
 Deterministic browser fixtures live under `tests/fixtures/`. They are intentionally plain HTML so userscript behavior can be exercised without depending on a live site's current DOM.
 
-For the scroll-to-bottom script, open `tests/fixtures/scroll-to-bottom.html` and verify:
+### Scroll to Bottom
+
+Open `tests/fixtures/scroll-to-bottom.html` and verify:
 
 1. The ↓ button is visible near the top of the page.
 2. Clicking it scrolls smoothly to the bottom.
 3. The button disappears at the bottom.
 4. Scrolling upward makes it reappear.
 5. Adding dynamic content while at the bottom makes it reappear because the page is no longer at the bottom.
+
+### Auto Retry
+
+Open `tests/fixtures/auto-retry.html` and verify:
+
+1. No auto-retry control is visible when no retry target exists.
+2. Adding a `Retry` or `Try again` button makes the countdown and disable control appear.
+3. Removing the target hides the control again.
+4. The per-tab disable checkbox pauses automatic clicking while the target remains present.
+5. Re-enabling resets the countdown.
 
 ## Repository rules
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Auto Retry Buttons
 // @namespace    https://github.com/KanbanTrainer/tampermonkey
-// @version      1.0.0
+// @version      1.0.1
 // @description  Automatically clicks Retry or Try again buttons every 30 seconds, with a countdown and per-tab pause control.
 // @match        *://*/*
 // @grant        none
@@ -18,6 +18,7 @@
   const RETRY_LABELS = new Set(['retry', 'try again']);
 
   let secondsRemaining = CHECK_INTERVAL_SECONDS;
+  let hadRetryTarget = false;
 
   function isDisabled() {
     try {
@@ -101,6 +102,7 @@
       right: '20px',
       bottom: '20px',
       zIndex: '2147483647',
+      display: 'none',
     });
 
     const shadow = host.attachShadow({ mode: 'open' });
@@ -160,7 +162,7 @@
     });
 
     document.documentElement.appendChild(host);
-    return { countdown, checkbox };
+    return { host, countdown, checkbox };
   }
 
   function updateStatus(countdown, disabled = isDisabled()) {
@@ -169,9 +171,7 @@
       : `Retry check in ${secondsRemaining}s`;
   }
 
-  function clickRetryButtons() {
-    const buttons = findRetryButtons();
-
+  function clickRetryButtons(buttons) {
     for (const button of buttons) {
       button.click();
     }
@@ -185,25 +185,58 @@
     }
   }
 
-  const { countdown, checkbox } = createStatusControl();
-  updateStatus(countdown, checkbox.checked);
+  const { host, countdown, checkbox } = createStatusControl();
+
+  function refreshPresence() {
+    const buttons = findRetryButtons();
+    const hasRetryTarget = buttons.length > 0;
+
+    host.style.display = hasRetryTarget ? 'block' : 'none';
+
+    if (hasRetryTarget && !hadRetryTarget) {
+      secondsRemaining = CHECK_INTERVAL_SECONDS;
+    }
+
+    if (!hasRetryTarget) {
+      secondsRemaining = CHECK_INTERVAL_SECONDS;
+    }
+
+    hadRetryTarget = hasRetryTarget;
+    checkbox.checked = isDisabled();
+
+    if (hasRetryTarget) {
+      updateStatus(countdown, checkbox.checked);
+    }
+
+    return buttons;
+  }
+
+  const observer = new MutationObserver(refreshPresence);
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ['disabled', 'aria-disabled'],
+  });
+
+  refreshPresence();
 
   setInterval(() => {
-    const disabled = isDisabled();
-    checkbox.checked = disabled;
+    const buttons = refreshPresence();
 
-    if (disabled) {
-      updateStatus(countdown, true);
+    if (buttons.length === 0 || isDisabled()) {
       return;
     }
 
     secondsRemaining -= 1;
 
     if (secondsRemaining <= 0) {
-      clickRetryButtons();
+      clickRetryButtons(buttons);
       secondsRemaining = CHECK_INTERVAL_SECONDS;
+      refreshPresence();
+    } else {
+      updateStatus(countdown, false);
     }
-
-    updateStatus(countdown, false);
   }, 1000);
 })();
