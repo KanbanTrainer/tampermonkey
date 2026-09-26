@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scroll to Bottom userscript fixture</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      padding: 1rem 1.25rem;
+      background: Canvas;
+      border-bottom: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+      z-index: 1;
+    }
+
+    main {
+      max-width: 48rem;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 8rem;
+    }
+
+    section {
+      min-height: 70vh;
+      padding-block: 1rem;
+      border-bottom: 1px dashed color-mix(in srgb, CanvasText 20%, transparent);
+    }
+
+    button {
+      font: inherit;
+      padding: 0.55rem 0.8rem;
+    }
+
+    #dynamic-content {
+      min-height: 10rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Scroll-to-bottom smoke-test fixture</strong>
+    <button id="append-content" type="button">Add dynamic content</button>
+  </header>
+
+  <main>
+    <section>
+      <h1>Top</h1>
+      <p>The userscript button should be visible because there is plenty of content below.</p>
+    </section>
+
+    <section>
+      <h2>Middle</h2>
+      <p>Scrolling should keep the userscript button visible until the viewport reaches the bottom.</p>
+    </section>
+
+    <section>
+      <h2>Near the bottom</h2>
+      <p>Click the userscript button and verify that the page scrolls smoothly to the bottom.</p>
+    </section>
+
+    <section id="dynamic-content">
+      <h2>Bottom</h2>
+      <p>At the bottom, the userscript button should disappear.</p>
+      <p>Then click “Add dynamic content” above. The page grows and the userscript button should reappear.</p>
+    </section>
+  </main>
+
+  <script>
+    const target = document.querySelector('#dynamic-content');
+    document.querySelector('#append-content').addEventListener('click', () => {
+      const block = document.createElement('section');
+      block.innerHTML = '<h2>Dynamic content</h2><p>This block was appended after page load to exercise MutationObserver behavior.</p>';
+      target.after(block);
+    });
+  </script>
+</body>
+</html>
