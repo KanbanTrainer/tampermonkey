@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Auto Retry Buttons
 // @namespace    https://github.com/KanbanTrainer/tampermonkey
-// @version      1.0.2
+// @version      1.0.3
 // @description  Automatically clicks Retry or Try again buttons every 30 seconds, with a countdown and per-tab pause control.
 // @match        *://*/*
 // @grant        none
@@ -204,6 +204,10 @@
 
     if (hasRetryTarget) {
       updateStatus(countdown, checkbox.checked);
+    } else if (hadRetryTarget) {
+      countdown.textContent = checkbox.checked
+        ? 'Auto-retry paused'
+        : 'Waiting for Retry…';
     }
 
     return buttons;
